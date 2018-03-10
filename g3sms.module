@@ -1,0 +1,117 @@
+<?php
+
+/**
+ * hook_menu
+ */
+function g3sms_menu() {
+  $items = array();
+
+  $items['g/admin/site/sms'] = array(
+    'title' => 'SMS Setup',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('g3sms_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'menu_name' => 'menu-groupanizer-menu',
+    'file' => 'g3sms.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Put an SMS action into the member table actions array
+ */
+function g3sms_gs_member_gtable_actions_alter(&$actions) {
+
+  // warning on the members page if sms not set up
+  $username = variable_get('g3sms_eztexting_username', '');
+  $password = variable_get('g3sms_eztexting_password', '');
+
+  // check that the username and password are set up, or bail out
+  if( empty($username) || empty($password) ) {
+    drupal_set_message(t("Your SMS module is enabled, but your SMS username and password are blank. Please paste them into the !link.", array('!link'=>l("SMS settings page", 'g/admin/site/sms'))), 'warning');
+    return;
+  }
+
+  $params = "<div><label>" . t("Enter your message to send as an SMS, up to 136 characters") . "</label>";
+  $params .= "<textarea style='width:100%' maxlength=136 class='gtable_confirm_params'></textarea>";
+  $params .= "<div>" . t("Remember, your SMS provider will charge you per text sent!") . "</div>";
+  $params .= "</div>";
+      
+  $actions['send_sms_message'] = array(
+    'title' => t('Send SMS Message'),
+    'params' => $params,
+    'redirect' => '/g/members',
+    'callback' => function($ids, $params) {
+
+      if( empty($ids) ) return;
+
+      // NB: message already limited to 136 chars by the textarea
+      $message = $params[0];
+
+
+      $numbers = db_query(
+       "SELECT field_mobile_phone_value FROM field_data_field_mobile_phone
+        WHERE entity_id IN (:ids) AND entity_type = 'user'",
+        array(':ids' => $ids)
+      )->fetchCol();
+
+      // strip out all non digits
+      $numbers = array_map( 
+        function($n) { return preg_replace("/[^0-9,.]/", "", $n); },
+        $numbers
+      );
+
+      // strip out any empty numbers
+      $numbers = array_filter( $numbers, function($n) { return !empty($n); } );
+
+      
+      if( sizeof($numbers) ) {
+
+        // we send one at a time so bad numbers don't screw up sending to good numbers in the batch
+        foreach($numbers AS $n) {
+
+          $query = array(
+            'User'          => variable_get('g3sms', ''),
+            'Password'      => 'acoustix',
+            'PhoneNumbers'  => array($n),
+            'Subject'       => "Choir Genius",
+            'Message'       => $message,
+          );
+
+          $url_encoded_query = drupal_http_build_query($query);
+
+          $options = array(
+            'method' => 'POST',
+            'data' => $url_encoded_query,
+            'timeout' => 15,
+            'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+          );
+
+          $result = drupal_http_request(
+            'https://app.eztexting.com/sending/messages?format=json',
+            $options
+          );
+
+          if( $result->code != 201 ) {
+
+            $data = drupal_json_decode($result->data);
+            switch($result->code) {
+              case 403:
+                $msg = t("Sorry, EZ Texting rejected your username or password. Check SMS settings!");
+                drupal_set_message($msg, 'error');
+                return $msg;
+              default:
+                drupal_set_message(t("Attempting to send to @num resulted in an error: @err (code @code)",
+                  array('@num'=>$n, '@err'=>implode(', ', $data['Response']['Errors']), '@code'=>$result->code)),
+                  'error');
+                break;
+            }
+
+          }
+        }
+      }
+        
+    }
+  );
+
+}

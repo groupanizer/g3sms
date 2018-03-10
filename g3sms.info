@@ -1,0 +1,5 @@
+name = Groupanizer SMS
+description = Integration with SMS vendors
+core = 7.x
+version = 7.x-1.0
+l10n path = http://local.groupanizer.com/sites/local.groupanizer.com/files/l10n_packager/%core/%project/%project-%release.%language.po
