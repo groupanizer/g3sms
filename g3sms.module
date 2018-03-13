@@ -44,10 +44,14 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
     'callback' => function($ids, $params) {
 
       if( empty($ids) ) return;
+      $username = variable_get('g3sms_eztexting_username', '');
+      $password = variable_get('g3sms_eztexting_password', '');
+      if( empty($username) || empty($password) ) {
+        return t("No credentials - please check your SMS settings!");
+      }
 
       // NB: message already limited to 136 chars by the textarea
       $message = $params[0];
-
 
       $numbers = db_query(
        "SELECT field_mobile_phone_value FROM field_data_field_mobile_phone
@@ -71,8 +75,8 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
         foreach($numbers AS $n) {
 
           $query = array(
-            'User'          => variable_get('g3sms', ''),
-            'Password'      => 'acoustix',
+            'User'          => $username,
+            'Password'      => $password,
             'PhoneNumbers'  => array($n),
             'Subject'       => "Choir Genius",
             'Message'       => $message,
@@ -97,13 +101,12 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
             $data = drupal_json_decode($result->data);
             switch($result->code) {
               case 403:
-                $msg = t("Sorry, EZ Texting rejected your username or password. Check SMS settings!");
-                drupal_set_message($msg, 'error');
-                return $msg;
+                // turns out they send back 403 for several cases, so we can't treat it as a hard stop
               default:
-                drupal_set_message(t("Attempting to send to @num resulted in an error: @err (code @code)",
-                  array('@num'=>$n, '@err'=>implode(', ', $data['Response']['Errors']), '@code'=>$result->code)),
-                  'error');
+                $msg = t("Attempting to send to @num resulted in an error: @err (code @code)",
+                  array('@num'=>$n, '@err'=>implode(', ', $data['Response']['Errors']), '@code'=>$result->code));
+                drupal_set_message( $msg, 'error');
+                watchdog('g3sms', "SMS Failed:<pre>".print_r($result,TRUE)."</pre>");
                 break;
             }
 
