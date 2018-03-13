@@ -27,5 +27,13 @@ function g3sms_settings_form($form, $form_state) {
     '#default_value' => variable_get('g3sms_eztexting_password'),
   );
 
+  $form['g3sms_eztexting_subject'] = array(
+    '#type' => 'textfield',
+    '#title' => 'EZTexting subject',
+    '#description' => t("This subject will be prepended to your messages"),
+    '#maxlength' => 12,
+    '#default_value' => variable_get('g3sms_eztexting_subject', "Choir Genius"),
+  );
+
   return system_settings_form($form);
 }

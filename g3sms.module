@@ -25,6 +25,7 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
   // warning on the members page if sms not set up
   $username = variable_get('g3sms_eztexting_username', '');
   $password = variable_get('g3sms_eztexting_password', '');
+  $subject = variable_get('g3sms_eztexting_subject', "Choir Genius");
 
   // check that the username and password are set up, or bail out
   if( empty($username) || empty($password) ) {
@@ -32,8 +33,8 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
     return;
   }
 
-  $params = "<div><label>" . t("Enter your message to send as an SMS, up to 136 characters") . "</label>";
-  $params .= "<textarea style='width:100%' maxlength=136 class='gtable_confirm_params'></textarea>";
+  $params = "<div><label>" . t("Enter your message to send as an SMS, up to 124 characters") . "</label>";
+  $params .= "<textarea style='width:100%' maxlength=124 class='gtable_confirm_params'></textarea>";
   $params .= "<div>" . t("Remember, your SMS provider will charge you per text sent!") . "</div>";
   $params .= "</div>";
       
@@ -50,7 +51,7 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
         return t("No credentials - please check your SMS settings!");
       }
 
-      // NB: message already limited to 136 chars by the textarea
+      // NB: message already limited to 124 chars by the textarea
       $message = $params[0];
 
       $numbers = db_query(
@@ -78,7 +79,7 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
             'User'          => $username,
             'Password'      => $password,
             'PhoneNumbers'  => array($n),
-            'Subject'       => "Choir Genius",
+            'Subject'       => variable_get('g3sms_eztexting_subject', "Choir Genius"),
             'Message'       => $message,
           );
 
