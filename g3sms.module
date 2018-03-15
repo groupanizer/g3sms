@@ -33,8 +33,8 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
     return;
   }
 
-  $params = "<div><label>" . t("Enter your message to send as an SMS, up to 124 characters") . "</label>";
-  $params .= "<textarea style='width:100%' maxlength=124 class='gtable_confirm_params'></textarea>";
+  $params = "<div><label>" . t("Enter your message to send as an SMS, up to 120 characters") . "</label>";
+  $params .= "<textarea style='width:100%' maxlength=120 class='gtable_confirm_params'></textarea>";
   $params .= "<div>" . t("Remember, your SMS provider will charge you per text sent!") . "</div>";
   $params .= "</div>";
       
@@ -51,7 +51,7 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
         return t("No credentials - please check your SMS settings!");
       }
 
-      // NB: message already limited to 124 chars by the textarea
+      // NB: message already limited to 120 chars by the textarea
       $message = $params[0];
 
       $numbers = db_query(
