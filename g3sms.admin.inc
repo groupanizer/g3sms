@@ -8,7 +8,7 @@ function g3sms_settings_form($form, $form_state) {
   $form = array();
   $form['message'] = array(
     '#markup' => t("Enter your EZ Texting username and password here. If you don't have one, sign up for an account at !link.",
-      array('!link' => l('EZ Texting', 'https://go.eztexting.com', array('attributes'=>array('target'=>'_blank'))))),
+      array('!link' => l('EZ Texting', 'https://app.eztexting.com', array('attributes'=>array('target'=>'_blank'))))),
   );
 
   $form['note'] = array(

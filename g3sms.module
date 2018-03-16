@@ -1,23 +1,6 @@
 <?php
 
 /**
- * hook_menu
- */
-function g3sms_menu() {
-  $items = array();
-
-  $items['g/admin/site/sms'] = array(
-    'title' => 'SMS Setup',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('g3sms_settings_form'),
-    'access arguments' => array('administer site configuration'),
-    'menu_name' => 'menu-groupanizer-menu',
-    'file' => 'g3sms.admin.inc',
-  );
-  return $items;
-}
-
-/**
  * Put an SMS action into the member table actions array
  */
 function g3sms_gs_member_gtable_actions_alter(&$actions) {
