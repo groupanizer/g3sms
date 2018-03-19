@@ -1,6 +1,125 @@
 <?php
 
 /**
+ * hook_menu
+ */
+function g3sms_menu() {
+  $items = array();
+  $items['g/admin/site/sms'] = array(
+    'title' => "SMS Settings",
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('g3sms_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'g3sms.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * util: put an array of phone numbers into canonical format
+ */
+function _g3sms_canonical_numbers($numbers) {
+
+  // strip out all non digits
+  $numbers = array_map( 
+    function($n) { return preg_replace("/[^0-9,.]/", "", $n); },
+    $numbers
+  );
+
+  // strip out any empty numbers
+  $numbers = array_filter( $numbers, function($n) { return !empty($n); } );
+
+  return $numbers;
+}
+
+/**
+ * util: send a message
+ */
+function _g3sms_send($message) {
+
+  $username = variable_get('g3sms_eztexting_username', '');
+  $password = variable_get('g3sms_eztexting_password', '');
+
+  $message['User'] = $username;
+  $message['Password'] = $password;
+
+  $url_encoded_query = drupal_http_build_query($message);
+
+  $options = array(
+    'method' => 'POST',
+    'data' => $url_encoded_query,
+    'timeout' => 15,
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+  );
+
+  $result = new StdClass();
+
+  try {
+    $result = drupal_http_request(
+    'https://app.eztexting.com/sending/messages?format=json',
+      $options
+    );
+  } catch( Exception $e ) {
+    $result->code = 500;
+  }
+
+  return $result;
+}
+
+/**
+ * API: send an sms message
+ * $message = array(
+ *   'PhoneNumbers'  => array($n),
+ *   'Subject'       => variable_get('g3sms_eztexting_subject', "Choir Genius"),
+ *   'Message'       => $message,
+ */
+function g3sms_send($message) {
+
+  $username = variable_get('g3sms_eztexting_username', '');
+  $password = variable_get('g3sms_eztexting_password', '');
+
+  if( empty($username) || empty($password) ) {
+    drupal_set_message(t("Your SMS module is enabled, but your SMS username and password are blank. Please paste them into the !link.", array('!link'=>l("SMS settings page", 'g/admin/site/sms'))), 'warning');
+    return 1;
+  }
+
+  $numbers = _g3sms_canonical_numbers($message['PhoneNumbers']);
+      
+  if( sizeof($numbers) ) {
+
+    // we send one at a time so bad numbers don't screw up sending to good numbers in the batch
+    foreach($numbers AS $n) {
+
+      $message = array(
+        'PhoneNumbers'  => array($n),
+        'Subject'       => $message['Subject'],
+        'Message'       => $message['Message'],
+      );
+      $result = _g3sms_send($message);
+
+      if( $result->code != 201 ) {
+
+        $data = drupal_json_decode($result->data);
+        switch($result->code) {
+          case 403:
+            // turns out they send back 403 for several cases, so we can't treat it as a hard stop
+          default:
+            $msg = t("Attempting to send to @num resulted in an error: @err (code @code)",
+              array('@num'=>$n, '@err'=>implode(', ', $data['Response']['Errors']), '@code'=>$result->code));
+            drupal_set_message( $msg, 'error');
+            watchdog('g3sms', "SMS Failed:<pre>".print_r($result,TRUE)."</pre>");
+            break;
+        }
+
+      }
+    }
+  }
+
+  return 0; // no error
+}
+
+
+/**
  * Put an SMS action into the member table actions array
  */
 function g3sms_gs_member_gtable_actions_alter(&$actions) {
@@ -43,42 +162,20 @@ function g3sms_gs_member_gtable_actions_alter(&$actions) {
         array(':ids' => $ids)
       )->fetchCol();
 
-      // strip out all non digits
-      $numbers = array_map( 
-        function($n) { return preg_replace("/[^0-9,.]/", "", $n); },
-        $numbers
-      );
+      $numbers = _g3sms_canonical_numbers($numbers);
 
-      // strip out any empty numbers
-      $numbers = array_filter( $numbers, function($n) { return !empty($n); } );
-
-      
       if( sizeof($numbers) ) {
 
         // we send one at a time so bad numbers don't screw up sending to good numbers in the batch
         foreach($numbers AS $n) {
 
-          $query = array(
-            'User'          => $username,
-            'Password'      => $password,
+          $message = array(
             'PhoneNumbers'  => array($n),
             'Subject'       => variable_get('g3sms_eztexting_subject', "Choir Genius"),
             'Message'       => $message,
           );
 
-          $url_encoded_query = drupal_http_build_query($query);
-
-          $options = array(
-            'method' => 'POST',
-            'data' => $url_encoded_query,
-            'timeout' => 15,
-            'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
-          );
-
-          $result = drupal_http_request(
-            'https://app.eztexting.com/sending/messages?format=json',
-            $options
-          );
+          $result = _g3sms_send($message);
 
           if( $result->code != 201 ) {
 
